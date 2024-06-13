@@ -26,6 +26,7 @@ const Renta = () => {
     const theme = useTheme();
     const colors = tokens(theme.palette.mode);
     const [rentaList,setRentas] = useState([]);
+    const [inspeccionList,setInspeccion] = useState([]);
     const [vehiculoList,setVehiculos] = useState([]);
     const [empleadoList,setEmpleados] = useState([]);
     const [clienteList,setClientes] = useState([]);
@@ -97,13 +98,13 @@ const Renta = () => {
     //form post
     const isNonMobile = useMediaQuery("(min-width:600px)");
     const handleFormSubmit = (values, {resetForm}) => {
-        console.log(values.cliente_id);
+        console.log(values)
         Axios.post("http://localhost:3001/renta", {
             empleado_id: values.empleado_id,
             vehiculo_id: values.vehiculo_id, 
             cliente_id: values.cliente_id, 
             renta_date: dayjs(values.renta_date).format('YYYY-MM-DD'), 
-            // devolucion_date: dayjs(values.devolucion_date).format('YYYY-MM-DD'), 
+            devolucion_date: values.devolucion_date ? dayjs(values.devolucion_date).format('YYYY-MM-DD') : null, 
             monto_diario: values.monto_diario, 
             cantidad_dias: values.cantidad_dias, 
             comentario: values.comentario
@@ -122,6 +123,11 @@ const Renta = () => {
     const getRentas = () =>{
         Axios.get("http://localhost:3001/renta").then((response)=>{
             setRentas(response.data);
+        });
+    }
+    const getInspeccion = () =>{
+        Axios.get("http://localhost:3001/inspeccion").then((response)=>{
+            setInspeccion(response.data);
         });
     }
     const getVehiculos = () =>{
@@ -145,6 +151,7 @@ const Renta = () => {
         getVehiculos();
         getEmpleados();
         getClientes();
+        getInspeccion();
     }, []);
     //Excel
     const exportToExcel = () => {
@@ -205,12 +212,19 @@ const Renta = () => {
     const rentaListFormatted = rentaList.map(renta => ({
         ...renta,
         renta_date: format(new Date(renta.renta_date), 'yyyy-MM-dd'),
-        devolucion_date: format(new Date(renta.devolucion_date), 'yyyy-MM-dd')
+        devolucion_date: renta.devolucion_date ? format(new Date(renta.devolucion_date), 'yyyy-MM-dd') : null,
     }));
-
     const vehiculosDisponibles = vehiculoList.filter((vehiculo) => {
         const vehiculoEnRenta = rentaListFormatted.find(renta => renta.vehiculo_id === vehiculo.id);
-        return !vehiculoEnRenta || vehiculoEnRenta.devolucion_date;
+        const inspeccion = inspeccionList.find(inspeccion => inspeccion.vehiculo_id === vehiculo.id);
+        if (!vehiculoEnRenta) {
+            return true;
+        }
+        if (vehiculoEnRenta.devolucion_date && inspeccion) {
+            const inspeccionDateFormatted = format(new Date(inspeccion.inspeccion_date), 'yyyy-MM-dd');
+            return vehiculoEnRenta.devolucion_date === inspeccionDateFormatted;
+        }
+        return false;
     });
 
     useEffect(() => {
@@ -735,7 +749,7 @@ const initialValues = {
     vehiculo_id: '', 
     cliente_id: '', 
     renta_date: dayjs(), 
-    devolucion_date: dayjs(), 
+    devolucion_date: null, 
     monto_diario: 0, 
     cantidad_dias: 0, 
     comentario: ''

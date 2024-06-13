@@ -26,6 +26,7 @@ const Inspeccion = () => {
     const theme = useTheme();
     const colors = tokens(theme.palette.mode);
     const [inspeccionList,setInspeccion] = useState([]);
+    const [rentaList,setRentas] = useState([]);
     const [vehiculoList,setVehiculo] = useState([]);
     const [clienteList,setCliente] = useState([]);
     const [empleadoList,setEmpleado] = useState([]);
@@ -142,6 +143,11 @@ const Inspeccion = () => {
             setInspeccion(response.data);
         });
     }
+    const getRentas = () =>{
+        Axios.get("http://localhost:3001/renta").then((response)=>{
+            setRentas(response.data);
+        });
+    }
     const getVehiculo = () =>{
         Axios.get("http://localhost:3001/vehiculos").then((response)=>{
             setVehiculo(response.data);
@@ -162,6 +168,7 @@ const Inspeccion = () => {
         getVehiculo();
         getClientes();
         getEmpleado();
+        getRentas();
     }, []);
     //Excel
     const exportToExcel = () => {
@@ -260,8 +267,8 @@ const Inspeccion = () => {
         {
             field:"inspeccion_date", 
             headerName:"Fecha de Ingreso",
-            flex: 1,
-            renderCell: (params) => format(new Date(params.value), 'yyyy-MM-dd')
+            flex: 1
+            // renderCell: (params) => format(new Date(params.value), 'yyyy-MM-dd')
         },   
         {field:"inspeccion_employee_id", headerName:"EMPLEADO",flex: 1},
         {
@@ -292,8 +299,30 @@ const Inspeccion = () => {
                 </>
             ),
         }
-
     ];
+
+    const rentaListFormatted = rentaList.map(renta => ({
+        ...renta,
+        renta_date: format(new Date(renta.renta_date), 'yyyy-MM-dd'),
+        devolucion_date: renta.devolucion_date ? format(new Date(renta.devolucion_date), 'yyyy-MM-dd') : null,
+    }));
+
+    const inspeccionListFormatted = inspeccionList.map(inspeccion => ({
+        ...inspeccion,
+        inspeccion_date: inspeccion.inspeccion_date ? format(new Date(inspeccion.inspeccion_date), 'yyyy-MM-dd') : null
+    }));
+
+    const vehiculosDisponibles = vehiculoList.filter((vehiculo) => {
+        const vehiculoEnRenta = rentaListFormatted.find(renta => renta.vehiculo_id === vehiculo.id);
+        if (!vehiculoEnRenta || !vehiculoEnRenta.devolucion_date) {
+            return false;
+        }
+        const inspeccion = inspeccionListFormatted.find(inspeccion => inspeccion.vehiculo_id === vehiculo.id);
+        return !inspeccion || vehiculoEnRenta.devolucion_date !== inspeccion.inspeccion_date;
+    });
+
+    useEffect(() => {
+    }, [rentaListFormatted,inspeccionListFormatted]);
 
     return(
         <Box m="20px">
@@ -346,7 +375,7 @@ const Inspeccion = () => {
                                         error={!!touched.vehiculo_id && !!errors.vehiculo_id}
                                         helperText={touched.vehiculo_id && errors.vehiculo_id}
                                     >
-                                        {vehiculoList.map((vehiculo) => (
+                                        {vehiculosDisponibles.map((vehiculo) => (
                                         <MenuItem key={vehiculo.id} value={vehiculo.id}>
                                             {vehiculo.descripcion}
                                         </MenuItem>
@@ -883,7 +912,7 @@ const Inspeccion = () => {
             >
             <Button variant="contained" color="primary" startIcon={<SaveIcon />} onClick={exportToExcel}>Exportar a Excel</Button>
             <Box m="5px"></Box>
-            <DataGrid rows={inspeccionList} columns={columns} autoHeight/>
+            <DataGrid rows={inspeccionListFormatted} columns={columns} autoHeight/>
             </Box>
         </Box>
     );
